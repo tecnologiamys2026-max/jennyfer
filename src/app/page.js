@@ -8,7 +8,7 @@ export default function Home() {
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
   const [currency, setCurrency] = useState('USD');
-  const [whatsapp, setWhatsapp] = useState('');
+  const [whatsapp, setWhatsapp] = useState('+5804144754175');
   const [loading, setLoading] = useState(true);
 
   // ── Carrito y Favoritos (localStorage) ──
@@ -268,7 +268,7 @@ export default function Home() {
         <div className="navbar-inner">
           <div className="navbar-brand" onClick={() => { resetFilters(); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ cursor: 'pointer' }}>
             <div className="navbar-logo-wrap">
-              <img src="/logo2.jpg" alt="Jennyfer" onError={(e) => { e.target.src = '/logo.jpeg'; }} />
+              <img src="/logo.jpg" alt="Jennyfer Boutique" onError={(e) => { e.target.src = '/logo.jpeg'; }} />
             </div>
             <div className="navbar-brand-text">
               <span className="navbar-brand-name">JENNYFER</span>
@@ -538,7 +538,7 @@ export default function Home() {
           ) : filteredProducts.length === 0 ? (
             <div className="empty-state-luxury">
               <div className="empty-state-icon-wrap">
-                <span>🧴</span>
+                <span>👗</span>
               </div>
               <h3>No encontramos coincidencias</h3>
               <p>Intenta cambiar los filtros seleccionados o realiza una búsqueda diferente.</p>
@@ -578,7 +578,7 @@ export default function Home() {
                           loading="lazy"
                         />
                       ) : (
-                        <div className="no-image">🧴</div>
+                        <div className="no-image">👗</div>
                       )}
 
                       {/* Badges superiores */}
@@ -1051,7 +1051,7 @@ export default function Home() {
         <div className="footer-inner">
           <div className="footer-brand">
             <div className="footer-logo-row">
-              <img src="/logo2.jpg" alt="Jennyfer" className="footer-logo" onError={(e) => { e.target.src = '/logo.jpeg'; }} />
+              <img src="/logo.jpg" alt="Jennyfer Boutique" className="footer-logo" onError={(e) => { e.target.src = '/logo.jpeg'; }} />
               <div>
                 <h3>JENNYFER</h3>
                 <span className="footer-sub">Boutique & Moda Exclusiva</span>

@@ -1,8 +1,12 @@
 import './globals.css'
 
 export const metadata = {
-  title: 'Jennyfer - Moda, Ropa y Tendencias',
-  description: 'Descubre nuestra exclusiva colección de ropa, moda y accesorios en tendencia. Compra en línea y contáctanos por WhatsApp.',
+  title: 'Jennyfer Boutique — Moda, Tendencias & Estilo Exclusivo',
+  description: 'Boutique de moda femenina, prendas exclusivas, vestidos, blusas, conjuntos y accesorios en tendencia. Atención personalizada y pedidos directos por WhatsApp.',
+  icons: {
+    icon: '/logo.jpg',
+    apple: '/logo.jpg',
+  },
 }
 
 export default function RootLayout({ children }) {

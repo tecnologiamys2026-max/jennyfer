@@ -363,7 +363,7 @@ export default function AdminPanel() {
       <div className="admin-login-wrapper">
         <Toaster position="top-center" />
         <div className="admin-login-box">
-          <img src="/logo2.jpg" alt="Jennyfer" className="admin-login-brand-logo" onError={(e) => { e.target.src = '/logo.jpeg'; }} />
+          <img src="/logo.jpg" alt="Jennyfer" className="admin-login-brand-logo" onError={(e) => { e.target.src = '/logo.jpeg'; }} />
           <h2 className="admin-login-title">JENNYFER</h2>
           <p className="admin-login-subtitle">Panel de Control & Gestión</p>
 
@@ -416,7 +416,7 @@ export default function AdminPanel() {
       <header className="admin-header-bar">
         <div className="admin-header-content">
           <div className="admin-header-brand-wrap">
-            <img src="/logo2.jpg" alt="Jennyfer" className="admin-header-logo" onError={(e) => { e.target.src = '/logo.jpeg'; }} />
+            <img src="/logo.jpg" alt="Jennyfer" className="admin-header-logo" onError={(e) => { e.target.src = '/logo.jpeg'; }} />
             <div>
               <h2 className="admin-header-title">JENNYFER</h2>
               <span className="admin-header-badge">Control & Facturación</span>
