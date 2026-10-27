@@ -5,7 +5,7 @@ import { uploadImage } from '@/lib/storage';
 export async function GET() {
   try {
     const products = await prisma.product.findMany({
-      include: { brand: true, category: true },
+      include: { brand: true, category: true, sizes: true, colors: true },
       orderBy: { createdAt: 'desc' }
     });
     return NextResponse.json(products);
@@ -26,6 +26,33 @@ export async function POST(request) {
     const isAvailable = data.get('isAvailable') !== 'false';
     const costPrice = data.get('costPrice') || '0';
     const stock = data.get('stock') || '0';
+
+    // Manejo de tallas y colores
+    const sizeIdsRaw = data.getAll('sizeIds');
+    let sizeIds = [];
+    if (sizeIdsRaw && sizeIdsRaw.length > 0) {
+      sizeIds = sizeIdsRaw.map(id => parseInt(id)).filter(id => !isNaN(id));
+    } else if (data.get('sizes')) {
+      try {
+        const parsed = JSON.parse(data.get('sizes'));
+        if (Array.isArray(parsed)) sizeIds = parsed.map(Number).filter(id => !isNaN(id));
+      } catch (e) {
+        sizeIds = data.get('sizes').split(',').map(s => parseInt(s.trim())).filter(id => !isNaN(id));
+      }
+    }
+
+    const colorIdsRaw = data.getAll('colorIds');
+    let colorIds = [];
+    if (colorIdsRaw && colorIdsRaw.length > 0) {
+      colorIds = colorIdsRaw.map(id => parseInt(id)).filter(id => !isNaN(id));
+    } else if (data.get('colors')) {
+      try {
+        const parsed = JSON.parse(data.get('colors'));
+        if (Array.isArray(parsed)) colorIds = parsed.map(Number).filter(id => !isNaN(id));
+      } catch (e) {
+        colorIds = data.get('colors').split(',').map(s => parseInt(s.trim())).filter(id => !isNaN(id));
+      }
+    }
 
     if (!name || !price || !brandId || !categoryId) {
       return NextResponse.json({ error: 'Faltan datos obligatorios' }, { status: 400 });
@@ -48,9 +75,11 @@ export async function POST(request) {
         brandId: parseInt(brandId),
         categoryId: parseInt(categoryId),
         isAvailable,
-        imageUrl
+        imageUrl,
+        sizes: sizeIds.length > 0 ? { connect: sizeIds.map(id => ({ id })) } : undefined,
+        colors: colorIds.length > 0 ? { connect: colorIds.map(id => ({ id })) } : undefined,
       },
-      include: { brand: true, category: true }
+      include: { brand: true, category: true, sizes: true, colors: true }
     });
 
     return NextResponse.json(newProduct);
@@ -84,6 +113,33 @@ export async function PUT(request) {
     const costPrice = data.get('costPrice') || '0';
     const stock = data.get('stock') || '0';
 
+    // Manejo de tallas y colores
+    const sizeIdsRaw = data.getAll('sizeIds');
+    let sizeIds = [];
+    if (sizeIdsRaw && sizeIdsRaw.length > 0) {
+      sizeIds = sizeIdsRaw.map(id => parseInt(id)).filter(id => !isNaN(id));
+    } else if (data.get('sizes')) {
+      try {
+        const parsed = JSON.parse(data.get('sizes'));
+        if (Array.isArray(parsed)) sizeIds = parsed.map(Number).filter(id => !isNaN(id));
+      } catch (e) {
+        sizeIds = data.get('sizes').split(',').map(s => parseInt(s.trim())).filter(id => !isNaN(id));
+      }
+    }
+
+    const colorIdsRaw = data.getAll('colorIds');
+    let colorIds = [];
+    if (colorIdsRaw && colorIdsRaw.length > 0) {
+      colorIds = colorIdsRaw.map(id => parseInt(id)).filter(id => !isNaN(id));
+    } else if (data.get('colors')) {
+      try {
+        const parsed = JSON.parse(data.get('colors'));
+        if (Array.isArray(parsed)) colorIds = parsed.map(Number).filter(id => !isNaN(id));
+      } catch (e) {
+        colorIds = data.get('colors').split(',').map(s => parseInt(s.trim())).filter(id => !isNaN(id));
+      }
+    }
+
     if (!id || !name || !price || !brandId || !categoryId) {
       return NextResponse.json({ error: 'Faltan datos obligatorios' }, { status: 400 });
     }
@@ -96,7 +152,9 @@ export async function PUT(request) {
       gender,
       brandId: parseInt(brandId),
       categoryId: parseInt(categoryId),
-      isAvailable
+      isAvailable,
+      sizes: { set: sizeIds.map(id => ({ id })) },
+      colors: { set: colorIds.map(id => ({ id })) }
     };
 
     if (file && file.size > 0 && file.name) {
@@ -105,7 +163,8 @@ export async function PUT(request) {
 
     const updatedProduct = await prisma.product.update({
       where: { id: parseInt(id) },
-      data: updateData
+      data: updateData,
+      include: { brand: true, category: true, sizes: true, colors: true }
     });
     return NextResponse.json(updatedProduct);
   } catch (error) {

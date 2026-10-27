@@ -7,6 +7,8 @@ export default function Home() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
+  const [sizes, setSizes] = useState([]);
+  const [colors, setColors] = useState([]);
   const [currency, setCurrency] = useState('USD');
   const [whatsapp, setWhatsapp] = useState('+5804144754175');
   const [loading, setLoading] = useState(true);
@@ -22,11 +24,15 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState('Todas');
   const [selectedBrand, setSelectedBrand] = useState('Todas');
   const [selectedGender, setSelectedGender] = useState('Todos');
+  const [selectedSize, setSelectedSize] = useState('Todas');
+  const [selectedColor, setSelectedColor] = useState('Todos');
   const [onlyLowStock, setOnlyLowStock] = useState(false);
 
   // ── Modales interactivos (Nuevas funcionalidades) ──
   const [quickViewProduct, setQuickViewProduct] = useState(null);
   const [quickViewQty, setQuickViewQty] = useState(1);
+  const [selectedQuickSize, setSelectedQuickSize] = useState('');
+  const [selectedQuickColor, setSelectedQuickColor] = useState('');
   const [quizOpen, setQuizOpen] = useState(false);
   const [quizStep, setQuizStep] = useState(1);
   const [quizAnswers, setQuizAnswers] = useState({ gender: '', vibe: '', occasion: '' });
@@ -35,23 +41,30 @@ export default function Home() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [resProducts, resCat, resBrand, resConfig] = await Promise.all([
+        const [resProducts, resCat, resBrand, resConfig, resSizes, resColors] = await Promise.all([
           fetch('/api/products'),
           fetch('/api/categories'),
           fetch('/api/brands'),
-          fetch('/api/settings')
+          fetch('/api/settings'),
+          fetch('/api/sizes'),
+          fetch('/api/colors')
         ]);
 
-        const [dataProducts, dataCat, dataBrand, dataConfig] = await Promise.all([
+        const [dataProducts, dataCat, dataBrand, dataConfig, dataSizes, dataColors] = await Promise.all([
           resProducts.json(),
           resCat.json(),
           resBrand.json(),
-          resConfig.json()
+          resConfig.json(),
+          resSizes.json(),
+          resColors.json()
         ]);
 
         if (Array.isArray(dataProducts)) setProducts(dataProducts);
         if (Array.isArray(dataCat)) setCategories(dataCat);
         if (Array.isArray(dataBrand)) setBrands(dataBrand);
+        if (Array.isArray(dataSizes)) setSizes(dataSizes);
+        if (Array.isArray(dataColors)) setColors(dataColors);
+
         if (dataConfig && typeof dataConfig === 'object') {
           if (dataConfig.whatsapp) setWhatsapp(dataConfig.whatsapp);
           if (dataConfig.currency) setCurrency(dataConfig.currency);
@@ -110,10 +123,24 @@ export default function Home() {
     }
   };
 
-  // ── Carrito ──
-  const addToCart = (product, qtyToAdd = 1, e) => {
+  // ── Carrito Inteligente con Talla y Color ──
+  const addToCart = (product, qtyToAdd = 1, e, chosenSize = null, chosenColor = null) => {
     if (e) e.stopPropagation();
-    const existing = cart.find(item => item.id === product.id);
+
+    // Si la prenda tiene tallas o colores y no se han especificado, abrir modal de selección
+    if ((product.sizes?.length > 0 || product.colors?.length > 0) && (!chosenSize && !chosenColor)) {
+      setQuickViewProduct(product);
+      setQuickViewQty(qtyToAdd || 1);
+      setSelectedQuickSize(product.sizes?.[0]?.name || '');
+      setSelectedQuickColor(product.colors?.[0]?.name || '');
+      return;
+    }
+
+    const sSize = chosenSize || (product.sizes?.[0]?.name || null);
+    const sColor = chosenColor || (product.colors?.[0]?.name || null);
+    const cartKey = `${product.id}_${sSize || ''}_${sColor || ''}`;
+
+    const existing = cart.find(item => item.cartKey === cartKey || (!item.cartKey && item.id === product.id));
     const currentQty = existing ? existing.quantity : 0;
     const requestedTotal = currentQty + qtyToAdd;
 
@@ -126,35 +153,43 @@ export default function Home() {
 
     if (existing) {
       setCart(cart.map(item =>
-        item.id === product.id ? { ...item, quantity: requestedTotal } : item
+        (item.cartKey === cartKey || (!item.cartKey && item.id === product.id)) ? { ...item, quantity: requestedTotal } : item
       ));
     } else {
-      setCart([...cart, { ...product, quantity: qtyToAdd }]);
+      setCart([...cart, { 
+        ...product, 
+        cartKey, 
+        selectedSize: sSize, 
+        selectedColor: sColor, 
+        quantity: qtyToAdd 
+      }]);
     }
 
-    toast.success(`${product.name} añadido`, {
+    const variantDetails = [sSize && `Talla: ${sSize}`, sColor && `Color: ${sColor}`].filter(Boolean).join(' • ');
+    toast.success(`${product.name}${variantDetails ? ` (${variantDetails})` : ''} añadido`, {
       style: { background: '#111', color: '#fff', borderLeft: '3px solid #d4af37' },
       iconTheme: { primary: '#d4af37', secondary: '#111' }
     });
   };
 
-  const updateQuantity = (productId, newQty) => {
+  const updateQuantity = (cartKey, newQty) => {
     if (newQty <= 0) {
-      setCart(cart.filter(item => item.id !== productId));
+      setCart(cart.filter(item => (item.cartKey || item.id) !== cartKey));
       return;
     }
-    const product = products.find(p => p.id === productId);
+    const item = cart.find(i => (i.cartKey || i.id) === cartKey);
+    const product = products.find(p => p.id === item?.id);
     if (product && newQty > product.stock) {
       toast.error(`Solo quedan ${product.stock} disponibles`);
       return;
     }
     setCart(cart.map(item =>
-      item.id === productId ? { ...item, quantity: newQty } : item
+      (item.cartKey || item.id) === cartKey ? { ...item, quantity: newQty } : item
     ));
   };
 
-  const removeFromCart = (productId) => {
-    setCart(cart.filter(item => item.id !== productId));
+  const removeFromCart = (cartKey) => {
+    setCart(cart.filter(item => (item.cartKey || item.id) !== cartKey));
   };
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -171,19 +206,23 @@ export default function Home() {
       const matchesCategory = selectedCategory === 'Todas' || product.category?.name === selectedCategory;
       const matchesBrand = selectedBrand === 'Todas' || product.brand?.name === selectedBrand;
       const matchesGender = selectedGender === 'Todos' || product.gender === selectedGender;
+      const matchesSize = selectedSize === 'Todas' || (product.sizes && product.sizes.some(s => s.name === selectedSize));
+      const matchesColor = selectedColor === 'Todos' || (product.colors && product.colors.some(c => c.name === selectedColor));
       const matchesFav = !onlyFavorites || favorites.includes(product.id);
       const matchesLowStock = !onlyLowStock || product.stock <= 3;
-      return matchesSearch && matchesCategory && matchesBrand && matchesGender && matchesFav && matchesLowStock;
+      return matchesSearch && matchesCategory && matchesBrand && matchesGender && matchesSize && matchesColor && matchesFav && matchesLowStock;
     });
-  }, [products, searchQuery, selectedCategory, selectedBrand, selectedGender, onlyFavorites, favorites, onlyLowStock]);
+  }, [products, searchQuery, selectedCategory, selectedBrand, selectedGender, selectedSize, selectedColor, onlyFavorites, favorites, onlyLowStock]);
 
-  const hasActiveFilters = searchQuery || selectedCategory !== 'Todas' || selectedBrand !== 'Todas' || selectedGender !== 'Todos' || onlyFavorites || onlyLowStock;
+  const hasActiveFilters = searchQuery || selectedCategory !== 'Todas' || selectedBrand !== 'Todas' || selectedGender !== 'Todos' || selectedSize !== 'Todas' || selectedColor !== 'Todos' || onlyFavorites || onlyLowStock;
 
   const resetFilters = () => {
     setSearchQuery('');
     setSelectedCategory('Todas');
     setSelectedBrand('Todas');
     setSelectedGender('Todos');
+    setSelectedSize('Todas');
+    setSelectedColor('Todos');
     setOnlyFavorites(false);
     setOnlyLowStock(false);
   };
@@ -197,7 +236,9 @@ export default function Home() {
       productId: item.id,
       name: item.name,
       price: parseFloat(item.price),
-      quantity: item.quantity
+      quantity: item.quantity,
+      selectedSize: item.selectedSize || null,
+      selectedColor: item.selectedColor || null
     }));
 
     try {
@@ -216,7 +257,13 @@ export default function Home() {
 
       const text = `🛍️ *¡HOLA JENNYFER! DESEO REALIZAR UN PEDIDO*\n\n` +
         `━━━━━━━━━━━━━━━━━━\n` +
-        orderItems.map((i, idx) => `*${idx + 1}.* ${i.name} (x${i.quantity}) → *${formatPrice(i.price * i.quantity)}*`).join('\n') +
+        orderItems.map((i, idx) => {
+          const details = [];
+          if (i.selectedSize) details.push(`Talla: ${i.selectedSize}`);
+          if (i.selectedColor) details.push(`Color: ${i.selectedColor}`);
+          const detailsStr = details.length > 0 ? ` [${details.join(' | ')}]` : '';
+          return `*${idx + 1}.* ${i.name}${detailsStr} (x${i.quantity}) → *${formatPrice(i.price * i.quantity)}*`;
+        }).join('\n') +
         `\n━━━━━━━━━━━━━━━━━━\n` +
         `💰 *TOTAL A PAGAR: ${formatPrice(cartTotal)}*\n\n` +
         `📍 ¿Cuáles son los datos para el pago móvil / transferencia? ¡Quedo atento(a)!`;
@@ -230,9 +277,16 @@ export default function Home() {
   };
 
   // Consulta por WhatsApp de un producto específico
-  const consultProductWhatsApp = (product) => {
+  const consultProductWhatsApp = (product, chosenSize = null, chosenColor = null) => {
     if (!whatsapp) return;
-    const text = `Hola Jennyfer ✨ Me gustaría más información sobre la prenda:\n*${product.name}* (${product.brand?.name || 'Boutique'})\nPrecio: *${formatPrice(product.price)}*\n¿Está disponible para entrega?`;
+    const sSize = chosenSize || selectedQuickSize;
+    const sColor = chosenColor || selectedQuickColor;
+    const variantsList = [];
+    if (sSize) variantsList.push(`📏 Talla: *${sSize}*`);
+    if (sColor) variantsList.push(`🎨 Color: *${sColor}*`);
+    const varText = variantsList.length > 0 ? `\n${variantsList.join('\n')}` : '';
+
+    const text = `Hola Jennyfer ✨ Me gustaría consultar disponibilidad de la prenda:\n*${product.name}* (${product.brand?.name || 'Boutique'})${varText}\n💰 Precio: *${formatPrice(product.price)}*\n¿Está disponible para entrega inmediata?`;
     window.open(`https://wa.me/${whatsapp.replace('+', '')}?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -474,7 +528,7 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Desplegables refinados para Categorías y Marcas */}
+            {/* Desplegables refinados para Categorías, Marcas, Tallas y Colores */}
             <div className="filter-dropdowns-row">
               <div className="select-pill-wrap">
                 <label className="select-pill-label">Categoría:</label>
@@ -497,6 +551,30 @@ export default function Home() {
                 >
                   <option value="Todas">Todas las Marcas</option>
                   {brands.map(brand => <option key={brand.id} value={brand.name}>{brand.name}</option>)}
+                </select>
+              </div>
+
+              <div className="select-pill-wrap">
+                <label className="select-pill-label">Talla:</label>
+                <select
+                  value={selectedSize}
+                  onChange={(e) => setSelectedSize(e.target.value)}
+                  className="luxury-select"
+                >
+                  <option value="Todas">Todas las Tallas</option>
+                  {sizes.map(size => <option key={size.id} value={size.name}>{size.name}</option>)}
+                </select>
+              </div>
+
+              <div className="select-pill-wrap">
+                <label className="select-pill-label">Color:</label>
+                <select
+                  value={selectedColor}
+                  onChange={(e) => setSelectedColor(e.target.value)}
+                  className="luxury-select"
+                >
+                  <option value="Todos">Todos los Colores</option>
+                  {colors.map(color => <option key={color.id} value={color.name}>{color.name}</option>)}
                 </select>
               </div>
 
@@ -554,7 +632,12 @@ export default function Home() {
                   <article
                     key={product.id}
                     className="product-card"
-                    onClick={() => { setQuickViewProduct(product); setQuickViewQty(1); }}
+                    onClick={() => {
+                      setQuickViewProduct(product);
+                      setQuickViewQty(1);
+                      setSelectedQuickSize(product.sizes?.[0]?.name || '');
+                      setSelectedQuickColor(product.colors?.[0]?.name || '');
+                    }}
                   >
                     {/* Botón de Favorito Flotante */}
                     <button
@@ -613,6 +696,33 @@ export default function Home() {
                       <h3 className="product-name" title={product.name}>
                         {product.name}
                       </h3>
+
+                      {/* ── MUESTRA DE TALLAS Y COLORES EN LA TARJETA ── */}
+                      {(product.sizes?.length > 0 || product.colors?.length > 0) && (
+                        <div className="product-card-variants">
+                          {product.sizes?.length > 0 && (
+                            <div className="product-sizes-preview">
+                              <span style={{ fontSize: '0.66rem', color: '#888', fontWeight: 'bold' }}>Tallas:</span>
+                              {product.sizes.map(s => (
+                                <span key={s.id} className="product-size-mini-chip">{s.name}</span>
+                              ))}
+                            </div>
+                          )}
+                          {product.colors?.length > 0 && (
+                            <div className="product-colors-preview">
+                              <span style={{ fontSize: '0.66rem', color: '#888', fontWeight: 'bold' }}>Colores:</span>
+                              {product.colors.map(c => (
+                                <span
+                                  key={c.id}
+                                  title={c.name}
+                                  className="product-color-mini-dot"
+                                  style={{ background: c.hexCode || '#111' }}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       <div className="product-pricing-row">
                         <div className="price-stack">
@@ -689,6 +799,54 @@ export default function Home() {
                   </p>
                 )}
 
+                {/* ── SELECTOR DE TALLA EN VISTA RÁPIDA ── */}
+                {quickViewProduct.sizes?.length > 0 && (
+                  <div className="quickview-variant-group">
+                    <div className="quickview-variant-header">
+                      <span className="quickview-variant-label">Elige tu Talla:</span>
+                      <span className="quickview-variant-selected-value">{selectedQuickSize || 'Selecciona una'}</span>
+                    </div>
+                    <div className="quickview-sizes-grid">
+                      {quickViewProduct.sizes.map(size => (
+                        <button
+                          key={size.id}
+                          type="button"
+                          onClick={() => setSelectedQuickSize(size.name)}
+                          className={`variant-size-pill ${selectedQuickSize === size.name ? 'active' : ''}`}
+                        >
+                          {size.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── SELECTOR DE COLOR EN VISTA RÁPIDA ── */}
+                {quickViewProduct.colors?.length > 0 && (
+                  <div className="quickview-variant-group">
+                    <div className="quickview-variant-header">
+                      <span className="quickview-variant-label">Elige tu Color:</span>
+                      <span className="quickview-variant-selected-value">{selectedQuickColor || 'Selecciona uno'}</span>
+                    </div>
+                    <div className="quickview-colors-grid">
+                      {quickViewProduct.colors.map(color => (
+                        <button
+                          key={color.id}
+                          type="button"
+                          onClick={() => setSelectedQuickColor(color.name)}
+                          className={`variant-color-circle-btn ${selectedQuickColor === color.name ? 'active' : ''}`}
+                        >
+                          <span
+                            className="variant-color-circle-preview"
+                            style={{ background: color.hexCode || '#111' }}
+                          />
+                          <span className="variant-color-name-text">{color.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Controles de cantidad */}
                 <div className="quickview-qty-row">
                   <span className="qty-label">Cantidad:</span>
@@ -714,7 +872,7 @@ export default function Home() {
                   <button
                     className="quickview-add-btn"
                     onClick={() => {
-                      addToCart(quickViewProduct, quickViewQty);
+                      addToCart(quickViewProduct, quickViewQty, null, selectedQuickSize, selectedQuickColor);
                       setQuickViewProduct(null);
                     }}
                   >
@@ -725,7 +883,7 @@ export default function Home() {
                   {whatsapp && (
                     <button
                       className="quickview-wa-btn"
-                      onClick={() => consultProductWhatsApp(quickViewProduct)}
+                      onClick={() => consultProductWhatsApp(quickViewProduct, selectedQuickSize, selectedQuickColor)}
                     >
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
@@ -916,7 +1074,7 @@ export default function Home() {
                 </div>
               ) : (
                 cart.map((item, index) => (
-                  <div key={item.id} className="cart-item" style={{ animationDelay: `${index * 0.04}s` }}>
+                  <div key={item.cartKey || item.id} className="cart-item" style={{ animationDelay: `${index * 0.04}s` }}>
                     {item.imageUrl ? (
                       <img src={item.imageUrl} alt={item.name} className="cart-item-image" />
                     ) : (
@@ -926,18 +1084,34 @@ export default function Home() {
                     <div className="cart-item-details">
                       <div className="cart-item-topline">
                         <span className="cart-item-brand">{item.brand?.name || 'Prenda'}</span>
-                        <button className="cart-item-remove" onClick={() => removeFromCart(item.id)} title="Eliminar">
+                        <button className="cart-item-remove" onClick={() => removeFromCart(item.cartKey || item.id)} title="Eliminar">
                           ✕
                         </button>
                       </div>
 
                       <p className="cart-item-name">{item.name}</p>
 
+                      {/* Variantes seleccionadas (Talla y Color) */}
+                      {(item.selectedSize || item.selectedColor) && (
+                        <div className="cart-item-variants-badge">
+                          {item.selectedSize && (
+                            <span className="cart-variant-tag">
+                              Talla: <strong>{item.selectedSize}</strong>
+                            </span>
+                          )}
+                          {item.selectedColor && (
+                            <span className="cart-variant-tag">
+                              Color: <strong>{item.selectedColor}</strong>
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       <div className="cart-item-bottom">
                         <div className="cart-qty-controls">
-                          <button className="qty-btn" onClick={() => updateQuantity(item.id, item.quantity - 1)}>−</button>
+                          <button className="qty-btn" onClick={() => updateQuantity(item.cartKey || item.id, item.quantity - 1)}>−</button>
                           <span className="cart-qty-display">{item.quantity}</span>
-                          <button className="qty-btn" onClick={() => updateQuantity(item.id, item.quantity + 1)}>+</button>
+                          <button className="qty-btn" onClick={() => updateQuantity(item.cartKey || item.id, item.quantity + 1)}>+</button>
                         </div>
                         <span className="cart-item-subtotal">{formatPrice(parseFloat(item.price) * item.quantity)}</span>
                       </div>

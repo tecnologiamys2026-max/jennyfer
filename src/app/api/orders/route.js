@@ -45,7 +45,9 @@ export async function POST(request) {
             create: items.map(item => ({
               productId: item.productId,
               quantity: item.quantity,
-              price: item.price
+              price: item.price,
+              selectedSize: item.selectedSize || item.size || null,
+              selectedColor: item.selectedColor || item.color || null
             }))
           }
         },
@@ -98,7 +100,13 @@ export async function PUT(request) {
             status, customerName, customerPhone, paymentMethod, totalAmount,
             items: {
               deleteMany: {},
-              create: items.map(item => ({ productId: item.productId, quantity: item.quantity, price: item.price }))
+              create: items.map(item => ({
+                productId: item.productId,
+                quantity: item.quantity,
+                price: item.price,
+                selectedSize: item.selectedSize || item.size || null,
+                selectedColor: item.selectedColor || item.color || null
+              }))
             }
           };
         }

@@ -23,6 +23,23 @@ model Category {
   updatedAt DateTime  @updatedAt
 }
 
+model Size {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Color {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  hexCode   String?   @default("#000000")
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
 model Product {
   id          Int      @id @default(autoincrement())
   name        String
@@ -38,6 +55,10 @@ model Product {
   // Relación con Categoría
   categoryId  Int
   category    Category @relation(fields: [categoryId], references: [id])
+
+  // Relación con Tallas y Colores
+  sizes       Size[]
+  colors      Color[]
 
   isAvailable Boolean  @default(true)
 
@@ -85,7 +106,11 @@ model OrderItem {
   
   quantity  Int      
   price     Decimal  @db.Decimal(10, 2) 
+
+  selectedSize  String?
+  selectedColor String?
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+

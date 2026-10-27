@@ -8,18 +8,27 @@ export default function AdminPanel() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-  // Estados para Categorías, Marcas y Productos
+  // Estados para Categorías, Marcas, Tallas, Colores y Productos
   const [brands, setBrands] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [sizes, setSizes] = useState([]);
+  const [colors, setColors] = useState([]);
   const [products, setProducts] = useState([]);
   const [newBrandName, setNewBrandName] = useState('');
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [newSizeName, setNewSizeName] = useState('');
+  const [newColorName, setNewColorName] = useState('');
+  const [newColorHex, setNewColorHex] = useState('#111111');
+  const [selectedSizes, setSelectedSizes] = useState([]);
+  const [selectedColors, setSelectedColors] = useState([]);
   const [loading, setLoading] = useState(false);
 
   // Filtros de tabla
   const [filterCategory, setFilterCategory] = useState('Todas');
   const [filterBrand, setFilterBrand] = useState('Todas');
   const [filterGender, setFilterGender] = useState('Todos');
+  const [filterSize, setFilterSize] = useState('Todas');
+  const [filterColor, setFilterColor] = useState('Todos');
   const [productSearch, setProductSearch] = useState('');
   const [viewMode, setViewMode] = useState('cards'); // 'cards' o 'table'
 
@@ -58,25 +67,31 @@ export default function AdminPanel() {
   // Función para cargar datos iniciales
   const loadData = async () => {
     try {
-      const [resBrands, resCategories, resProducts, resSettings, resOrders] = await Promise.all([
+      const [resBrands, resCategories, resProducts, resSettings, resOrders, resSizes, resColors] = await Promise.all([
         fetch('/api/brands'),
         fetch('/api/categories'),
         fetch('/api/products'),
         fetch('/api/settings'),
-        fetch('/api/orders')
+        fetch('/api/orders'),
+        fetch('/api/sizes'),
+        fetch('/api/colors')
       ]);
 
-      const [dataBrands, dataCategories, dataProducts, dataSettings, dataOrders] = await Promise.all([
+      const [dataBrands, dataCategories, dataProducts, dataSettings, dataOrders, dataSizes, dataColors] = await Promise.all([
         resBrands.json(),
         resCategories.json(),
         resProducts.json(),
         resSettings.json(),
-        resOrders.json()
+        resOrders.json(),
+        resSizes.json(),
+        resColors.json()
       ]);
 
       if (Array.isArray(dataBrands)) setBrands(dataBrands);
       if (Array.isArray(dataCategories)) setCategories(dataCategories);
       if (Array.isArray(dataProducts)) setProducts(dataProducts);
+      if (Array.isArray(dataSizes)) setSizes(dataSizes);
+      if (Array.isArray(dataColors)) setColors(dataColors);
 
       if (dataSettings && typeof dataSettings === 'object') {
         if (dataSettings.whatsapp) setWhatsapp(dataSettings.whatsapp);
@@ -150,6 +165,49 @@ export default function AdminPanel() {
     setLoading(false);
   };
 
+  const handleSaveSize = async (e) => {
+    e.preventDefault();
+    if (!newSizeName.trim()) return;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/sizes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newSizeName.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setNewSizeName('');
+      loadData();
+      toast.success('Talla agregada exitosamente');
+    } catch (error) {
+      toast.error(error.message || 'Error al guardar la talla');
+    }
+    setLoading(false);
+  };
+
+  const handleSaveColor = async (e) => {
+    e.preventDefault();
+    if (!newColorName.trim()) return;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/colors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newColorName.trim(), hexCode: newColorHex })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setNewColorName('');
+      setNewColorHex('#111111');
+      loadData();
+      toast.success('Color agregado exitosamente');
+    } catch (error) {
+      toast.error(error.message || 'Error al guardar el color');
+    }
+    setLoading(false);
+  };
+
   const handleDeleteClick = (type, id) => {
     setModal({ isOpen: true, mode: 'delete', type, id, name: '' });
   };
@@ -158,6 +216,8 @@ export default function AdminPanel() {
     if (type === 'producto') {
       const p = products.find(prod => prod.id === id);
       setEditingProduct(p);
+      setSelectedSizes((p?.sizes || []).map(s => s.id));
+      setSelectedColors((p?.colors || []).map(c => c.id));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       setModal({ isOpen: true, mode: 'edit', type, id, name: currentName });
@@ -169,7 +229,13 @@ export default function AdminPanel() {
     setModal({ ...modal, isOpen: false });
     toast.loading('Eliminando...', { id: 'deleteToast' });
     try {
-      const endpoint = type === 'marca' ? '/api/brands' : type === 'categoria' ? '/api/categories' : '/api/products';
+      const endpoint = 
+        type === 'marca' ? '/api/brands' : 
+        type === 'categoria' ? '/api/categories' : 
+        type === 'talla' ? '/api/sizes' :
+        type === 'color' ? '/api/colors' :
+        '/api/products';
+
       const response = await fetch(endpoint, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -195,7 +261,13 @@ export default function AdminPanel() {
     toast.loading('Actualizando...', { id: 'editToast' });
     
     try {
-      const endpoint = type === 'marca' ? '/api/brands' : type === 'categoria' ? '/api/categories' : '/api/products';
+      const endpoint = 
+        type === 'marca' ? '/api/brands' : 
+        type === 'categoria' ? '/api/categories' : 
+        type === 'talla' ? '/api/sizes' :
+        type === 'color' ? '/api/colors' :
+        '/api/products';
+
       const response = await fetch(endpoint, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -219,6 +291,10 @@ export default function AdminPanel() {
     if (editingProduct) {
       formData.append('id', editingProduct.id);
     }
+
+    // Agregar IDs de tallas y colores seleccionados
+    selectedSizes.forEach(id => formData.append('sizeIds', id));
+    selectedColors.forEach(id => formData.append('colorIds', id));
     
     if (!formData.get('name') || !formData.get('price') || !formData.get('categoryId') || !formData.get('brandId')) {
       toast.error('Por favor, llena los campos obligatorios (*)');
@@ -237,6 +313,8 @@ export default function AdminPanel() {
       toast.success(editingProduct ? 'Producto actualizado correctamente' : 'Producto guardado correctamente', { id: 'saveProduct' });
       form.reset();
       setEditingProduct(null);
+      setSelectedSizes([]);
+      setSelectedColors([]);
       loadData();
     } catch (error) {
       toast.error(error.message || 'Error al guardar', { id: 'saveProduct' });
@@ -484,6 +562,13 @@ export default function AdminPanel() {
           </button>
 
           <button
+            onClick={() => setActiveTab('tallas')}
+            className={`admin-tab-item ${activeTab === 'tallas' ? 'active' : ''}`}
+          >
+            <span>👗</span> Tallas & Colores
+          </button>
+
+          <button
             onClick={() => setActiveTab('config')}
             className={`admin-tab-item ${activeTab === 'config' ? 'active' : ''}`}
           >
@@ -510,7 +595,11 @@ export default function AdminPanel() {
                 {editingProduct && (
                   <button
                     type="button"
-                    onClick={() => setEditingProduct(null)}
+                    onClick={() => {
+                      setEditingProduct(null);
+                      setSelectedSizes([]);
+                      setSelectedColors([]);
+                    }}
                     style={{ background: '#f1f1f1', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '20px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}
                   >
                     ✕ Cancelar Edición
@@ -638,6 +727,74 @@ export default function AdminPanel() {
                   </div>
                 </div>
 
+                {/* ── APARTADO: TALLAS DISPONIBLES ── */}
+                <div className="admin-variant-selector-box">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', color: '#333' }}>
+                      📏 Tallas Disponibles ({selectedSizes.length} seleccionadas)
+                    </label>
+                    <span style={{ fontSize: '0.75rem', color: '#777' }}>Clic para marcar / desmarcar</span>
+                  </div>
+                  <div className="admin-variant-chips-wrap">
+                    {sizes.length === 0 ? (
+                      <span style={{ fontSize: '0.8rem', color: '#999' }}>No hay tallas creadas. Visita la pestaña "👗 Tallas & Colores" para agregarlas.</span>
+                    ) : (
+                      sizes.map(size => {
+                        const isSelected = selectedSizes.includes(size.id);
+                        return (
+                          <button
+                            key={size.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedSizes(isSelected ? selectedSizes.filter(id => id !== size.id) : [...selectedSizes, size.id]);
+                            }}
+                            className={`admin-variant-toggle-chip ${isSelected ? 'selected' : ''}`}
+                          >
+                            <span>{isSelected ? '✓' : '+'}</span>
+                            <span>{size.name}</span>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* ── APARTADO: COLORES DISPONIBLES ── */}
+                <div className="admin-variant-selector-box">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', color: '#333' }}>
+                      🎨 Colores Disponibles ({selectedColors.length} seleccionados)
+                    </label>
+                    <span style={{ fontSize: '0.75rem', color: '#777' }}>Clic para marcar / desmarcar</span>
+                  </div>
+                  <div className="admin-variant-chips-wrap">
+                    {colors.length === 0 ? (
+                      <span style={{ fontSize: '0.8rem', color: '#999' }}>No hay colores creados. Visita la pestaña "👗 Tallas & Colores" para agregarlos.</span>
+                    ) : (
+                      colors.map(color => {
+                        const isSelected = selectedColors.includes(color.id);
+                        return (
+                          <button
+                            key={color.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedColors(isSelected ? selectedColors.filter(id => id !== color.id) : [...selectedColors, color.id]);
+                            }}
+                            className={`admin-variant-toggle-chip ${isSelected ? 'selected' : ''}`}
+                          >
+                            <span
+                              className="product-color-mini-dot"
+                              style={{ background: color.hexCode || '#111' }}
+                            />
+                            <span>{color.name}</span>
+                            {isSelected && <span>✓</span>}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.5rem' }}>
                   <input
                     name="isAvailable"
@@ -721,6 +878,24 @@ export default function AdminPanel() {
                   <option value="Unisex">Unisex</option>
                   <option value="Infantil">Infantil</option>
                 </select>
+
+                <select
+                  value={filterSize}
+                  onChange={(e) => setFilterSize(e.target.value)}
+                  style={{ padding: '0.65rem 1rem', borderRadius: '25px', border: '1px solid #ccc', background: '#fff', fontSize: '0.85rem' }}
+                >
+                  <option value="Todas">Todas las Tallas</option>
+                  {sizes.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                </select>
+
+                <select
+                  value={filterColor}
+                  onChange={(e) => setFilterColor(e.target.value)}
+                  style={{ padding: '0.65rem 1rem', borderRadius: '25px', border: '1px solid #ccc', background: '#fff', fontSize: '0.85rem' }}
+                >
+                  <option value="Todos">Todos los Colores</option>
+                  {colors.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                </select>
               </div>
 
               {/* Vista Móvil / Tarjetas Ergonómicas */}
@@ -732,16 +907,33 @@ export default function AdminPanel() {
                       const matchCat = filterCategory === 'Todas' || String(p.categoryId) === String(filterCategory);
                       const matchBr = filterBrand === 'Todas' || String(p.brandId) === String(filterBrand);
                       const matchG = filterGender === 'Todos' || p.gender === filterGender;
-                      return matchSearch && matchCat && matchBr && matchG;
+                      const matchSz = filterSize === 'Todas' || (p.sizes && p.sizes.some(s => s.name === filterSize));
+                      const matchClr = filterColor === 'Todos' || (p.colors && p.colors.some(c => c.name === filterColor));
+                      return matchSearch && matchCat && matchBr && matchG && matchSz && matchClr;
                     })
                     .map(p => (
                       <div key={p.id} className="admin-product-row-card">
                         <img src={p.imageUrl || '/logo2.jpg'} alt={p.name} className="admin-prod-thumb" onError={(e) => { e.target.src = '/logo.jpeg'; }} />
-                        <div className="admin-prod-info">
+                        <div className="admin-prod-info" style={{ flex: 1 }}>
                           <span style={{ fontSize: '0.68rem', color: '#b89225', textTransform: 'uppercase', fontWeight: 'bold' }}>
                             {p.brand?.name || 'Marca'} • {p.gender || 'Unisex'}
                           </span>
                           <h4>{p.name}</h4>
+
+                          {/* Variantes en tarjeta */}
+                          {(p.sizes?.length > 0 || p.colors?.length > 0) && (
+                            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', margin: '0.3rem 0', alignItems: 'center' }}>
+                              {p.sizes?.map(s => (
+                                <span key={s.id} style={{ fontSize: '0.65rem', padding: '0.1rem 0.35rem', background: '#f1f1f1', borderRadius: '3px', fontWeight: 'bold', color: '#333' }}>
+                                  {s.name}
+                                </span>
+                              ))}
+                              {p.colors?.map(c => (
+                                <span key={c.id} title={c.name} style={{ width: '12px', height: '12px', borderRadius: '50%', background: c.hexCode || '#111', display: 'inline-block', border: '1.5px solid #fff', boxShadow: '0 0 0 1px #ccc' }} />
+                              ))}
+                            </div>
+                          )}
+
                           <div className="admin-prod-prices">
                             <span className="admin-prod-sell-price">{formatPrice(p.price)}</span>
                             {p.costPrice > 0 && <span className="admin-prod-cost-price">Costo: {formatPrice(p.costPrice)}</span>}
@@ -766,12 +958,13 @@ export default function AdminPanel() {
               ) : (
                 /* Vista de Tabla Clásica */
                 <div style={{ overflowX: 'auto', border: '1px solid #eee', borderRadius: '8px' }}>
-                  <table style={{ width: '100%', minWidth: '650px', textAlign: 'left', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <table style={{ width: '100%', minWidth: '720px', textAlign: 'left', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                     <thead style={{ background: '#111', color: '#f5e4b2' }}>
                       <tr>
                         <th style={{ padding: '0.75rem' }}>Foto</th>
                         <th style={{ padding: '0.75rem' }}>Nombre</th>
                         <th style={{ padding: '0.75rem' }}>Marca</th>
+                        <th style={{ padding: '0.75rem' }}>Tallas / Colores</th>
                         <th style={{ padding: '0.75rem' }}>Precio Venta</th>
                         <th style={{ padding: '0.75rem' }}>Costo</th>
                         <th style={{ padding: '0.75rem' }}>Stock</th>
@@ -785,7 +978,9 @@ export default function AdminPanel() {
                           const matchCat = filterCategory === 'Todas' || String(p.categoryId) === String(filterCategory);
                           const matchBr = filterBrand === 'Todas' || String(p.brandId) === String(filterBrand);
                           const matchG = filterGender === 'Todos' || p.gender === filterGender;
-                          return matchSearch && matchCat && matchBr && matchG;
+                          const matchSz = filterSize === 'Todas' || (p.sizes && p.sizes.some(s => s.name === filterSize));
+                          const matchClr = filterColor === 'Todos' || (p.colors && p.colors.some(c => c.name === filterColor));
+                          return matchSearch && matchCat && matchBr && matchG && matchSz && matchClr;
                         })
                         .map(p => (
                           <tr key={p.id} style={{ borderBottom: '1px solid #eee' }}>
@@ -794,6 +989,12 @@ export default function AdminPanel() {
                             </td>
                             <td style={{ padding: '0.6rem', fontWeight: 'bold' }}>{p.name}</td>
                             <td style={{ padding: '0.6rem' }}>{p.brand?.name}</td>
+                            <td style={{ padding: '0.6rem' }}>
+                              <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                                {p.sizes?.map(s => <span key={s.id} style={{ fontSize: '0.68rem', padding: '0.1rem 0.35rem', background: '#eee', borderRadius: '3px', fontWeight: 'bold' }}>{s.name}</span>)}
+                                {p.colors?.map(c => <span key={c.id} title={c.name} style={{ width: '12px', height: '12px', borderRadius: '50%', background: c.hexCode || '#000', display: 'inline-block', border: '1px solid #ccc' }} />)}
+                              </div>
+                            </td>
                             <td style={{ padding: '0.6rem', fontWeight: 'bold' }}>{formatPrice(p.price)}</td>
                             <td style={{ padding: '0.6rem', color: '#777' }}>{formatPrice(p.costPrice)}</td>
                             <td style={{ padding: '0.6rem' }}>
@@ -1249,7 +1450,113 @@ export default function AdminPanel() {
         )}
 
         {/* ═══════════════════════════════════════════
-            TAB 6: CONFIGURACIÓN
+            TAB 6: TALLAS & COLORES (BOUTIQUE FASHION)
+        ═══════════════════════════════════════════ */}
+        {activeTab === 'tallas' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+            {/* Gestión de Tallas */}
+            <div className="admin-luxury-card">
+              <h3 className="admin-card-title" style={{ marginBottom: '0.5rem' }}>
+                <span>📏</span> Tallas de Ropa ({sizes.length})
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: '#666', marginBottom: '1.25rem' }}>
+                Registra y edita las tallas de las prendas (Ej: XS, S, M, L, XL, XXL, Única, 28, 30, etc.)
+              </p>
+
+              <form onSubmit={handleSaveSize} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                <input
+                  type="text"
+                  value={newSizeName}
+                  onChange={e => setNewSizeName(e.target.value)}
+                  placeholder="Nueva Talla (Ej. M, 34, Única)"
+                  style={{ flex: 1, padding: '0.7rem', borderRadius: '8px', border: '1px solid #ccc' }}
+                  required
+                />
+                <button disabled={loading} type="submit" className="admin-btn-gold" style={{ width: 'auto', padding: '0.7rem 1.25rem' }}>
+                  Guardar
+                </button>
+              </form>
+
+              <ul style={{ listStyle: 'none', border: '1px solid #eee', borderRadius: '8px', padding: '0.5rem', maxHeight: '360px', overflowY: 'auto' }}>
+                {sizes.length === 0 && <li style={{ padding: '1rem', color: '#888' }}>No hay tallas registradas aún.</li>}
+                {sizes.map(size => (
+                  <li key={size.id} style={{ padding: '0.7rem', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontWeight: 'bold', fontSize: '0.92rem', background: '#f5f5f5', padding: '0.2rem 0.65rem', borderRadius: '6px', color: '#111' }}>
+                        {size.name}
+                      </span>
+                    </div>
+                    <div>
+                      <button onClick={() => handleEditClick('talla', size.id, size.name)} className="admin-btn-action-edit" style={{ marginRight: '6px' }}>Editar</button>
+                      <button onClick={() => handleDeleteClick('talla', size.id)} className="admin-btn-action-del">✕</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Gestión de Colores */}
+            <div className="admin-luxury-card">
+              <h3 className="admin-card-title" style={{ marginBottom: '0.5rem' }}>
+                <span>🎨</span> Colores ({colors.length})
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: '#666', marginBottom: '1.25rem' }}>
+                Crea los tonos disponibles para tus prendas con su muestra de color.
+              </p>
+
+              <form onSubmit={handleSaveColor} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                <input
+                  type="color"
+                  value={newColorHex}
+                  onChange={e => setNewColorHex(e.target.value)}
+                  style={{ width: '46px', height: '42px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: 'transparent' }}
+                  title="Seleccionar tono visual"
+                />
+                <input
+                  type="text"
+                  value={newColorName}
+                  onChange={e => setNewColorName(e.target.value)}
+                  placeholder="Nombre Color (Ej. Beige, Rosado)"
+                  style={{ flex: '1 1 180px', padding: '0.7rem', borderRadius: '8px', border: '1px solid #ccc' }}
+                  required
+                />
+                <button disabled={loading} type="submit" className="admin-btn-gold" style={{ width: 'auto', padding: '0.7rem 1.25rem' }}>
+                  Guardar
+                </button>
+              </form>
+
+              <ul style={{ listStyle: 'none', border: '1px solid #eee', borderRadius: '8px', padding: '0.5rem', maxHeight: '360px', overflowY: 'auto' }}>
+                {colors.length === 0 && <li style={{ padding: '1rem', color: '#888' }}>No hay colores registrados aún.</li>}
+                {colors.map(color => (
+                  <li key={color.id} style={{ padding: '0.7rem', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <span
+                        style={{
+                          width: '22px',
+                          height: '22px',
+                          borderRadius: '50%',
+                          background: color.hexCode || '#111',
+                          border: '2px solid #fff',
+                          boxShadow: '0 0 0 1px #ccc',
+                          display: 'inline-block'
+                        }}
+                      />
+                      <strong style={{ fontSize: '0.9rem' }}>{color.name}</strong>
+                      <span style={{ fontSize: '0.72rem', color: '#888' }}>{color.hexCode}</span>
+                    </div>
+                    <div>
+                      <button onClick={() => handleEditClick('color', color.id, color.name)} className="admin-btn-action-edit" style={{ marginRight: '6px' }}>Editar</button>
+                      <button onClick={() => handleDeleteClick('color', color.id)} className="admin-btn-action-del">✕</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════
+            TAB 7: CONFIGURACIÓN
         ═══════════════════════════════════════════ */}
         {activeTab === 'config' && (
           <div className="admin-luxury-card" style={{ maxWidth: '600px' }}>
@@ -1344,7 +1651,9 @@ export default function AdminPanel() {
 
             {modal.mode === 'edit' && (
               <>
-                <h3 style={{ marginBottom: '0.75rem', color: '#111', fontSize: '1.25rem' }}>Editar {modal.type === 'marca' ? 'Marca' : 'Categoría'}</h3>
+                <h3 style={{ marginBottom: '0.75rem', color: '#111', fontSize: '1.25rem' }}>
+                  Editar {modal.type === 'marca' ? 'Marca' : modal.type === 'categoria' ? 'Categoría' : modal.type === 'talla' ? 'Talla' : 'Color'}
+                </h3>
                 <input
                   type="text"
                   value={modal.name}
