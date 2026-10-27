@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Brand {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?  @db.Text
+  price       Decimal  @db.Decimal(10, 2)
+  imageUrl    String?
+  gender      String?  // Ej: "Dama", "Caballero", "Unisex"
+  
+  // Relación con Marca
+  brandId     Int
+  brand       Brand    @relation(fields: [brandId], references: [id])
+  
+  // Relación con Categoría
+  categoryId  Int
+  category    Category @relation(fields: [categoryId], references: [id])
+
+  isAvailable Boolean  @default(true)
+
+  // Nuevos campos para inventario
+  costPrice   Decimal  @default(0) @db.Decimal(10, 2)
+  stock       Int      @default(0)
+
+  // Relación con facturación
+  orderItems  OrderItem[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Setting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id            Int         @id @default(autoincrement())
+  customerName  String?     
+  customerPhone String?     
+  totalAmount   Decimal     @db.Decimal(10, 2)
+  status        String      @default("COMPLETED") // PENDING, COMPLETED, CANCELLED
+  paymentMethod String?     // EFECTIVO, TARJETA, TRANSFERENCIA
+  
+  items         OrderItem[] 
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model OrderItem {
+  id        Int      @id @default(autoincrement())
+  
+  orderId   Int
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id])
+  
+  quantity  Int      
+  price     Decimal  @db.Decimal(10, 2) 
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
